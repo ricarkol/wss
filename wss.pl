@@ -174,10 +174,12 @@ if ($profile) {
 	printf "Watching PID $pid page references during $duration seconds...\n";
 }
 printf "%-7s %-7s ", "Slp(s)", "Dur(s)" if $moretimes;
-printf "%-7s %10s %10s %10s %15s\n", "Est(s)", "RSS(MB)", "PSS(MB)", "Ref(MB)", "Ref-anon(MBs)";
+printf "%-7s %10s %10s %10s %20s %20s %20s %20s\n", "Est(s)", "RSS(MB)", "PSS(MB)", "Ref(MB)",
+		"SharedClean(MBs)", "SharedDirty(MBs)",
+		"PrivateClean(MBs)", "PrivateDirty(MBs)";
 
 ### main
-my ($rss, $pss, $referenced, $anonymous);
+my ($rss, $pss, $referenced, $shared_clean, $shared_dirty, $private_clean, $private_dirty);
 my ($ts0, $ts1, $ts2, $ts3, $ts4, $ts5);
 my ($settime, $sleeptime, $readtime, $durtime, $esttime);
 my $metric;
@@ -222,7 +224,7 @@ while (1) {
 	kill -STOP, $pid if $pausetarget;
 
 	# read referenced counts
-	$rss = $pss = $referenced = $anonymous = 0;
+	$rss = $pss = $referenced = $shared_clean = 0;
 	open SMAPS, $smaps or die "ERROR: can't open $smaps: $!";
 	# slurp smaps quickly to minimize unwanted WSS growth during reading:
 	my @smaps = <SMAPS>;
@@ -236,8 +238,14 @@ while (1) {
 			$metric = \$pss;
 		} elsif ($line =~ /^Referenced:/) {
 			$metric = \$referenced;
-		} elsif ($line =~ /^Anonymous:/) {
-			$metric = \$anonymous;
+		} elsif ($line =~ /^Shared_Clean:/) {
+			$metric = \$shared_clean;
+		} elsif ($line =~ /^Shared_Dirty:/) {
+			$metric = \$shared_dirty;
+		} elsif ($line =~ /^Private_Clean:/) {
+			$metric = \$private_clean;
+		} elsif ($line =~ /^Private_Dirty:/) {
+			$metric = \$private_dirty;
 		} else {
 			next;
 		}
@@ -262,8 +270,10 @@ while (1) {
 
 	# output
 	printf "%-7.3f %-7.3f ", $sleeptime, $durtime if $moretimes;
-	printf "%-7.3f %10.2f %10.2f %10.2f %15.2f\n", $esttime,
-	    $rss / 1024, $pss / 1024, $referenced / 1024, $anonymous / 1024;
+	printf "%-7.3f %10.2f %10.2f %10.2f %20.2f %20.2f %20.2f %20.2f\n", $esttime,
+	    $rss / 1024, $pss / 1024, $referenced / 1024,
+		$shared_clean / 1024, $shared_dirty / 1024,
+		$private_clean / 1024, $private_dirty / 1024;
 
 	# snopshot sleeps
 	if ($snapshot != -1) {
